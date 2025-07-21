@@ -3,13 +3,13 @@
   "workspaces": {
     "": {
       "devDependencies": {
-        "@adraffy/blocksmith": "^0.1.52",
+        "@adraffy/blocksmith": "^0.1.53",
         "@unruggable/gateways": "^1.2.3",
       },
     },
   },
   "packages": {
-    "@adraffy/blocksmith": ["@adraffy/blocksmith@0.1.52", "", { "dependencies": { "ethers": "^6.13.4" } }, "sha512-WstkbNlCBjZNjFmgosmr9UZ+jaIW+s5R9RAeaUuUXhAL3tHym5qzPy2T5Zvb4zymuAGxiOuiKkGkGM8gFtEWEw=="],
+    "@adraffy/blocksmith": ["@adraffy/blocksmith@0.1.53", "", { "dependencies": { "ethers": "^6.13.4" } }, "sha512-m0klD54yMqxgEhBTOixxJKwPkzbCRczYCBJMebopAoV1oayiG3dQGAe9wVq1csCdDpeMagQkvPjWnWebuEYBaA=="],
 
     "@adraffy/ens-normalize": ["@adraffy/ens-normalize@1.10.1", "", {}, "sha512-96Z2IP3mYmF1Xg2cDm8f1gWGf/HUVedQ3FMifV4kG/PQ4yEP51xDtRAEfhVNt5f/uzpNkZHwWQuUcu6D6K+Ekw=="],
 

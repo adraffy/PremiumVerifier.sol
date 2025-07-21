@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { ethers } from "ethers";
 import { Foundry } from "@adraffy/blocksmith";
-import { ABI_CODER } from "@unruggable/gateways";
 import { generateProof } from "../src/prover.js";
 
 const label = "raffy";
@@ -15,26 +14,24 @@ try {
 		import: "@ensdomains/contracts/registry/ENSRegistry.sol",
 	});
 
+	// note: this was compiled with an super old version of solc/oz
+	// when compiled against oz4+ the storage layout is different
+	// using the deployed mainnet bytecode instead
+	// https://etherscan.io/address/0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85
 	const ethRegistrar = await foundry.deploy({
-		bytecode: ethers.concat([
-			await readFile(
-				new URL("./ethRegistrarCode.txt", import.meta.url),
-				"utf8"
-			),
-			ABI_CODER.encode(
-				["address", "bytes32"],
-				[ensRegistry.target, ethers.namehash("eth")]
-			),
-		]),
-		abi: [
-			`function GRACE_PERIOD() view returns (uint256)`,
-			`function available(uint256 id) view returns (bool)`,
-			`function ownerOf(uint256 id) view returns (address)`,
-			`function addController(address controller)`,
-			`function register(uint256 id, address owner, uint256 duration) payable`,
-		],
+		bytecode: await readFile(
+			new URL("./ethRegistrarCode.txt", import.meta.url),
+			"utf8"
+		),
+		args: [ensRegistry.target, ethers.namehash("eth")],
+		abi: await foundry
+			.resolveArtifact({
+				import: "@ensdomains/contracts/ethregistrar/BaseRegistrarImplementation.sol",
+			})
+			.then((x) => x.abi),
 	});
 
+	// assign "eth" to eth registrar
 	await foundry.confirm(
 		ensRegistry.setSubnodeRecord(
 			ethers.ZeroHash,
@@ -45,11 +42,13 @@ try {
 		)
 	);
 
+	// setup addr.reverse registrar
 	const reverseRegistrar = await foundry.deploy({
 		import: "@ensdomains/contracts/reverseRegistrar/ReverseRegistrar.sol",
 		args: [ensRegistry],
 	});
 
+	// assign "addr.reverse" to reverse registrar
 	await foundry.confirm(
 		ensRegistry.setSubnodeRecord(
 			ethers.ZeroHash,
@@ -59,7 +58,6 @@ try {
 			0
 		)
 	);
-
 	await foundry.confirm(
 		ensRegistry.setSubnodeRecord(
 			ethers.namehash("reverse"),
@@ -70,21 +68,23 @@ try {
 		)
 	);
 
+	// setup an "open" resolver for primary names
 	const fakeNameResolver = await foundry.deploy(`contract FakeNameResolver {
 		function setName(bytes32 node, string calldata name) external {
 			// do nothing
 		}
 	}`);
-
 	await foundry.confirm(
 		reverseRegistrar.setDefaultResolver(fakeNameResolver)
 	);
 
+	// setup name wrapper
 	const nameWrapper = await foundry.deploy({
 		import: "@ensdomains/contracts/wrapper/NameWrapper.sol",
 		args: [ensRegistry, ethRegistrar, ethers.ZeroAddress],
 	});
 
+	// setup constant usd oracle
 	const ethPrice = 4000;
 	const fakeUSDOracle = await foundry.deploy(`contract FakeUSDOracle {
 		function latestAnswer() external view returns (int256) {
@@ -92,6 +92,7 @@ try {
 		}
 	}`);
 
+	// setup exponential price oracle using constant usd oracle
 	const priceOracle = await foundry.deploy({
 		import: "@ensdomains/contracts/ethregistrar/ExponentialPremiumPriceOracle.sol",
 		args: [
@@ -102,6 +103,7 @@ try {
 		],
 	});
 
+	// setup wrapped controller
 	const wrappedController = await foundry.deploy({
 		import: "@ensdomains/contracts/ethregistrar/ETHRegistrarController.sol",
 		args: [
@@ -115,15 +117,17 @@ try {
 		],
 	});
 
+	// add wrapped controller and ourselves as controllers
 	await foundry.confirm(ethRegistrar.addController(wrappedController));
 	await foundry.confirm(ethRegistrar.addController(foundry.wallets.admin));
 
+	// setup verifier
 	const verifier = await foundry.deploy({
 		file: "PremiumVerifier",
 		args: [ethRegistrar, nameWrapper, priceOracle],
 	});
 
-	// register
+	// register name
 	await foundry.confirm(
 		ethRegistrar.register(
 			ethers.id(label),
@@ -136,16 +140,16 @@ try {
 	const GRACE_PERIOD = BigInt(await ethRegistrar.GRACE_PERIOD());
 	await foundry.nextBlock({ sec: GRACE_PERIOD + BigInt(15 * ONE_DAY) }); // 0-21 days
 
-	// check in premium
+	// ensure it's in premium
 	await assert.rejects(() => ethRegistrar.ownerOf(ethers.id(label)));
 	assert(await ethRegistrar.available(ethers.id(label)));
 	assert(await wrappedController.available(label));
 
-	// check price
+	// double check: non-zero premium
 	const { premium } = await wrappedController.rentPrice(label, ONE_YEAR);
 	assert(premium > 0);
 
-	// register again
+	// register name again
 	const receipt = await foundry.confirm(
 		ethRegistrar.register(
 			ethers.id(label),
@@ -157,6 +161,7 @@ try {
 	// wait a bit
 	await foundry.nextBlock({ sec: 300 });
 
+	// generate a proof at the block of the premium registration
 	const proof = await generateProof(
 		foundry.provider,
 		BigInt(receipt.blockNumber),
