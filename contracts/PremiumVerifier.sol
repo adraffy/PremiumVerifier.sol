@@ -47,7 +47,7 @@ contract PremiumVerifier {
         priceOracle = _priceOracle;
     }
 
-    function provePremiumPurchase(
+    function verifyPremiumPurchase(
         bytes calldata vProof
     ) external view returns (address owner0, uint256 premium) {
         Proof memory proof = abi.decode(vProof, (Proof));

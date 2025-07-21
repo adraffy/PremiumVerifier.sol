@@ -167,8 +167,8 @@ try {
 		}
 	);
 
-	const gas = await verifier.provePremiumPurchase.estimateGas(proof);
-	const [owner0, premium2] = await verifier.provePremiumPurchase(proof);
+	const gas = await verifier.verifyPremiumPurchase.estimateGas(proof);
+	const [owner0, premium2] = await verifier.verifyPremiumPurchase(proof);
 
 	console.log({ gas, owner0, premium, premium2 });
 
