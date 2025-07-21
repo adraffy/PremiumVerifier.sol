@@ -1,0 +1,20 @@
+# https://book.getfoundry.sh/reference/config/overview
+
+[profile.default]
+optimizer = true
+optimizer_runs = 1000
+
+src = "contracts"
+libs = ["lib"]
+
+remappings = [	
+	"lib/ens-contracts/:@openzeppelin=lib/oz-v4/",
+	"@ensdomains/=lib/ens-contracts/",
+	"lib/optimism/packages/contracts-bedrock/:src=lib/optimism/packages/contracts-bedrock/src/",
+	"@optimism/=lib/optimism/packages/contracts-bedrock/",
+]
+
+# forge i foundry-rs/forge-std
+# forge i ethereum-optimism/optimism
+# forge i ensdomains/ens-contracts
+# forge i oz-v4=OpenZeppelin/openzeppelin-contracts@release-v4.9
